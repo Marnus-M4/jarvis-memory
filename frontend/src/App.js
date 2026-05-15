@@ -3,21 +3,20 @@ import { useState, useEffect } from "react";
 function App() {
   const [input, setInput] = useState("");
 
-  // ✅ current active chat
   const [chat, setChat] = useState([]);
-
-  // ✅ all previous chats (history)
   const [allChats, setAllChats] = useState(() => {
     const saved = localStorage.getItem("allChats");
     return saved ? JSON.parse(saved) : [];
   });
 
-  // ✅ persist history to localStorage when it changes
+  const [activeChatIndex, setActiveChatIndex] = useState(null);
+
+  // ✅ Save history
   useEffect(() => {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
 
-  // ✅ save chat when page reloads (important fix)
+  // ✅ Save current chat on refresh
   useEffect(() => {
     return () => {
       if (chat.length > 0) {
@@ -30,7 +29,7 @@ function App() {
     };
   }, [chat]);
 
-  // ✅ send message to backend
+  // ✅ Send message
   const sendMessage = async () => {
     if (!input) return;
 
@@ -49,48 +48,74 @@ function App() {
       setInput("");
 
     } catch (error) {
-      console.error(error);
       setChat(prev => [...prev, { user: input, ai: "Error: backend not reachable" }]);
     }
   };
 
+  // ✅ Load previous chat when clicked
+  const loadChat = (index) => {
+    setActiveChatIndex(index);
+    setChat(allChats[index]);
+  };
+
+  // ✅ Start new chat
+  const newChat = () => {
+    setChat([]);
+    setActiveChatIndex(null);
+  };
+
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Jarvis AI</h1>
+    <div style={{ display: "flex", height: "100vh" }}>
 
-      {/* ✅ CURRENT CHAT */}
-      <h2>Current Chat</h2>
-      {chat.map((msg, i) => (
-        <div key={i}>
-          <p><b>You:</b> {msg.user}</p>
-          <p><b>Jarvis:</b> {msg.ai}</p>
+      {/* ✅ LEFT SIDEBAR */}
+      <div style={{
+        width: "250px",
+        borderRight: "1px solid #ccc",
+        padding: "10px",
+        overflowY: "auto"
+      }}>
+        <h2>Chats</h2>
+
+        <button onClick={newChat} style={{ width: "100%", marginBottom: "10px" }}>
+          + New Chat
+        </button>
+
+        {allChats.map((c, index) => (
+          <div
+            key={index}
+            onClick={() => loadChat(index)}
+            style={{
+              padding: "10px",
+              marginBottom: "5px",
+              cursor: "pointer",
+              background: activeChatIndex === index ? "#ddd" : "#f5f5f5"
+            }}
+          >
+            Chat {index + 1}
+          </div>
+        ))}
+      </div>
+
+      {/* ✅ RIGHT CHAT AREA */}
+      <div style={{ flex: 1, padding: "20px" }}>
+        <h1>Jarvis AI</h1>
+
+        <div style={{ marginBottom: "20px" }}>
+          {chat.map((msg, i) => (
+            <div key={i}>
+              <p><b>You:</b> {msg.user}</p>
+              <p><b>Jarvis:</b> {msg.ai}</p>
+            </div>
+          ))}
         </div>
-      ))}
 
-      {/* ✅ INPUT */}
-      <input
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Ask something..."
-      />
-      <button onClick={sendMessage}>Send</button>
-
-      {/* ✅ NEW CHAT BUTTON */}
-      <br /><br />
-      <button onClick={() => setChat([])}>
-        Start New Chat
-      </button>
-
-      {/* ✅ CHAT HISTORY */}
-      <h2>Chat History</h2>
-      {allChats.map((c, index) => (
-        <div
-          key={index}
-          style={{ border: "1px solid gray", padding: 10, margin: 5 }}
-        >
-          <p><b>Chat {index + 1}</b> ({c.length} messages)</p>
-        </div>
-      ))}
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask something..."
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
     </div>
   );
 }
