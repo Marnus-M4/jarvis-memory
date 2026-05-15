@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 function App() {
   const [input, setInput] = useState("");
@@ -24,23 +24,25 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, loading]);
 
-  // ✅ ✅ AUTO SAVE CURRENT CHAT ON REFRESH (FIXED)
-  const saveCurrentChat = () => {
+  // ✅ ✅ FIXED AUTO SAVE FUNCTION
+  const saveCurrentChat = useCallback(() => {
     if (chat.length === 0 || activeChatIndex !== null) return;
 
     const title = chat[0]?.user?.slice(0, 30) || "New Chat";
 
     const existing = JSON.parse(localStorage.getItem("allChats")) || [];
 
-    // ✅ Prevent duplicates
     const last = existing[existing.length - 1];
+
+    // ✅ prevent duplicates
     if (JSON.stringify(last?.messages) === JSON.stringify(chat)) return;
 
     const updated = [...existing, { title, messages: chat }];
 
     localStorage.setItem("allChats", JSON.stringify(updated));
-  };
+  }, [chat, activeChatIndex]);
 
+  // ✅ ✅ FIXED useEffect (NO ERRORS)
   useEffect(() => {
     const handleUnload = () => {
       saveCurrentChat();
@@ -51,7 +53,7 @@ function App() {
     return () => {
       window.removeEventListener("beforeunload", handleUnload);
     };
-  }, [chat, activeChatIndex]);
+  }, [saveCurrentChat]);
 
   // ✅ SCREEN CAPTURE
   const captureScreen = async () => {
@@ -123,7 +125,7 @@ function App() {
   };
 
   const newChat = () => {
-    saveCurrentChat(); // ✅ ensures current chat is saved
+    saveCurrentChat(); // ✅ ensures save
     setChat([]);
     setActiveChatIndex(null);
   };
@@ -231,7 +233,7 @@ function App() {
           <div ref={chatEndRef}></div>
         </div>
 
-        {/* ✅ PROFESSIONAL INPUT BAR */}
+        {/* ✅ INPUT */}
         <div style={{
           padding: "15px",
           borderTop: "1px solid #ddd",
@@ -255,7 +257,6 @@ function App() {
                 border: "none",
                 outline: "none",
                 resize: "none",
-                fontSize: "14px",
                 padding: "8px",
                 minHeight: "40px",
                 background: "transparent"
@@ -284,8 +285,7 @@ function App() {
               border: "none",
               borderRadius: "8px",
               padding: "8px 14px",
-              cursor: "pointer",
-              fontWeight: "bold"
+              cursor: "pointer"
             }}>
               ➤
             </button>
