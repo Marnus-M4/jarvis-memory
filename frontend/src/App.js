@@ -14,6 +14,7 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // ✅ SAVE ALL CHATS
   useEffect(() => {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
@@ -22,6 +23,35 @@ function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, loading]);
+
+  // ✅ ✅ AUTO SAVE CURRENT CHAT ON REFRESH (FIXED)
+  const saveCurrentChat = () => {
+    if (chat.length === 0 || activeChatIndex !== null) return;
+
+    const title = chat[0]?.user?.slice(0, 30) || "New Chat";
+
+    const existing = JSON.parse(localStorage.getItem("allChats")) || [];
+
+    // ✅ Prevent duplicates
+    const last = existing[existing.length - 1];
+    if (JSON.stringify(last?.messages) === JSON.stringify(chat)) return;
+
+    const updated = [...existing, { title, messages: chat }];
+
+    localStorage.setItem("allChats", JSON.stringify(updated));
+  };
+
+  useEffect(() => {
+    const handleUnload = () => {
+      saveCurrentChat();
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [chat, activeChatIndex]);
 
   // ✅ SCREEN CAPTURE
   const captureScreen = async () => {
@@ -60,9 +90,7 @@ function App() {
 
       const res = await fetch("https://jarvis-memory-8w92.onrender.com/ask", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: input,
           image: screenshot
@@ -95,10 +123,7 @@ function App() {
   };
 
   const newChat = () => {
-    if (chat.length > 0 && activeChatIndex === null) {
-      const title = chat[0]?.user?.slice(0, 30) || "New Chat";
-      setAllChats(prev => [...prev, { title, messages: chat }]);
-    }
+    saveCurrentChat(); // ✅ ensures current chat is saved
     setChat([]);
     setActiveChatIndex(null);
   };
@@ -155,7 +180,6 @@ function App() {
           >
             {c.title}
 
-            {/* ✅ HOVER MENU */}
             <div className="menu" style={{
               position: "absolute",
               right: 10,
@@ -221,8 +245,6 @@ function App() {
             padding: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
           }}>
-
-            {/* ✅ TEXTAREA */}
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -240,7 +262,6 @@ function App() {
               }}
             />
 
-            {/* ✅ SCREEN TOGGLE */}
             <label style={{
               display: "flex",
               alignItems: "center",
@@ -257,27 +278,21 @@ function App() {
               Screen
             </label>
 
-            {/* ✅ SEND BUTTON */}
-            <button
-              onClick={sendMessage}
-              style={{
-                background: "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 14px",
-                cursor: "pointer",
-                fontWeight: "bold"
-              }}
-            >
+            <button onClick={sendMessage} style={{
+              background: "#007bff",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              padding: "8px 14px",
+              cursor: "pointer",
+              fontWeight: "bold"
+            }}>
               ➤
             </button>
-
           </div>
         </div>
       </div>
 
-      {/* ✅ HOVER STYLE */}
       <style>
         {`
           div:hover > .menu {
