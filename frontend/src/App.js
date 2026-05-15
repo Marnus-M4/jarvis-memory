@@ -3,50 +3,63 @@ import { useState, useEffect } from "react";
 function App() {
   const [input, setInput] = useState("");
   const [chat, setChat] = useState([]);
+  const [activeChatIndex, setActiveChatIndex] = useState(null);
 
+  // ✅ load chat history
   const [allChats, setAllChats] = useState(() => {
     const saved = localStorage.getItem("allChats");
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [activeChatIndex, setActiveChatIndex] = useState(null);
-
-  // ✅ Save to localStorage
+  // ✅ save history
   useEffect(() => {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
 
-  // ✅ Save chat on page refresh
-  useEffect(() => {
-    const handleUnload = () => {
-      if (chat.length > 0 && activeChatIndex === null) {
-        const title = chat[0]?.user?.slice(0, 30) || "New Chat";
+  // ✅ CAPTURE SCREEN
+  const captureScreen = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true
+      });
 
-        const updated = [
-          ...allChats,
-          { title, messages: chat }
-        ];
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
 
-        localStorage.setItem("allChats", JSON.stringify(updated));
-      }
-    };
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-    window.addEventListener("beforeunload", handleUnload);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
 
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload);
-    };
-  }, [chat, allChats, activeChatIndex]);
+      const image = canvas.toDataURL("image/png");
 
-  // ✅ SEND MESSAGE
+      stream.getTracks().forEach(track => track.stop());
+
+      return image;
+
+    } catch (err) {
+      console.log("Screen capture cancelled");
+      return null;
+    }
+  };
+
+  // ✅ SEND MESSAGE (WITH SCREEN)
   const sendMessage = async () => {
     if (!input) return;
 
     try {
+      const screenshot = await captureScreen();
+
       const res = await fetch("https://jarvis-memory-8w92.onrender.com/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: input })
+        body: JSON.stringify({
+          question: input,
+          image: screenshot
+        })
       });
 
       const data = await res.json();
@@ -55,7 +68,15 @@ function App() {
       setInput("");
 
     } catch {
-      setChat(prev => [...prev, { user: input, ai: "Error: backend not reachable" }]);
+      setChat(prev => [...prev, { user: input, ai: "Error sending message" }]);
+    }
+  };
+
+  // ✅ ENTER / SHIFT+ENTER
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
@@ -65,7 +86,7 @@ function App() {
     setChat(allChats[index].messages);
   };
 
-  // ✅ NEW CHAT
+  // ✅ CREATE NEW CHAT
   const newChat = () => {
     if (chat.length > 0 && activeChatIndex === null) {
       const title = chat[0]?.user?.slice(0, 30) || "New Chat";
@@ -93,7 +114,7 @@ function App() {
 
   // ✅ RENAME CHAT
   const renameChat = (index) => {
-    const newName = prompt("Enter new name:");
+    const newName = prompt("Rename chat:");
     if (!newName) return;
 
     const updated = [...allChats];
@@ -106,13 +127,13 @@ function App() {
 
       {/* ✅ SIDEBAR */}
       <div style={{
-        width: "250px",
+        width: 250,
         borderRight: "1px solid #ccc",
-        padding: "10px"
+        padding: 10
       }}>
         <h2>Chats</h2>
 
-        <button onClick={newChat} style={{ width: "100%", marginBottom: 10 }}>
+        <button onClick={newChat} style={{ width: "100%" }}>
           + New Chat
         </button>
 
@@ -123,29 +144,23 @@ function App() {
             style={{
               position: "relative",
               padding: 10,
-              marginBottom: 5,
+              marginTop: 5,
               cursor: "pointer",
-              background: activeChatIndex === i ? "#ddd" : "#f5f5f5",
-              display: "flex",
-              justifyContent: "space-between"
+              background: activeChatIndex === i ? "#ddd" : "#f5f5f5"
             }}
           >
-            {/* ✅ TITLE */}
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-              {c.title}
-            </span>
+            {c.title}
 
-            {/* ✅ 3 DOT MENU */}
+            {/* ✅ MENU */}
             <span
               style={{
-                cursor: "pointer",
-                visibility: "hidden"
+                position: "absolute",
+                right: 10
               }}
-              className="menu-btn"
               onClick={(e) => {
                 e.stopPropagation();
 
-                const action = prompt("Type 'delete' or 'rename'");
+                const action = prompt("delete or rename");
 
                 if (action === "delete") deleteChat(i);
                 if (action === "rename") renameChat(i);
@@ -157,31 +172,34 @@ function App() {
         ))}
       </div>
 
-      {/* ✅ MAIN CHAT */}
+      {/* ✅ MAIN */}
       <div style={{
         flex: 1,
         display: "flex",
         flexDirection: "column"
       }}>
 
-        {/* ✅ MESSAGES */}
+        {/* ✅ CHAT MESSAGES */}
         <div style={{
           flex: 1,
           overflowY: "auto",
           padding: 20
         }}>
           {chat.map((msg, i) => (
-            <div key={i} style={{
-              display: "flex",
-              justifyContent: msg.user ? "flex-end" : "flex-start",
-              marginBottom: 10
-            }}>
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                justifyContent: msg.user ? "flex-end" : "flex-start",
+                marginBottom: 10
+              }}
+            >
               <div style={{
-                maxWidth: "60%",
-                padding: "10px",
-                borderRadius: "10px",
+                padding: 10,
+                borderRadius: 10,
                 background: msg.user ? "#007bff" : "#e5e5ea",
-                color: msg.user ? "white" : "black"
+                color: msg.user ? "white" : "black",
+                maxWidth: "60%"
               }}>
                 {msg.user ?? msg.ai}
               </div>
@@ -191,28 +209,26 @@ function App() {
 
         {/* ✅ INPUT */}
         <div style={{
-          padding: "10px",
-          borderTop: "1px solid #ccc",
-          display: "flex"
+          display: "flex",
+          padding: 10,
+          borderTop: "1px solid #ccc"
         }}>
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault(); // prevents newline
-              sendMessage();
-              }
-              }}
-              placeholder="Ask something..."
-              style={{
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask something..."
+            style={{
               flex: 1,
-              padding: "10px",
               resize: "none",
-              height: "50px"
-              }}
-            />
-          <button onClick={sendMessage}>Send</button>
+              padding: 10,
+              height: 50
+            }}
+          />
+
+          <button onClick={sendMessage}>
+            Send
+          </button>
         </div>
 
       </div>
