@@ -7,7 +7,7 @@ function App() {
   const sendMessage = async () => {
     if (!input) return;
 
-    const res = await fetch("http://127.0.0.1:8000/ask", {
+    const res = await fetch("https://jarvis-memory-8w92.onrender.com", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
