@@ -196,11 +196,16 @@ function App() {
           display: "flex"
         }}>
           <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask something..."
-            style={{ flex: 1, padding: 10 }}
-          />
+  value={input}
+  onChange={(e) => setInput(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
+  }}
+  placeholder="Ask something..."
+  style={{ flex: 1, padding: 10 }}
+/>
           <button onClick={sendMessage}>Send</button>
         </div>
 
