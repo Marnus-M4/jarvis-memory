@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 
 function App() {
   const [input, setInput] = useState("");
-
   const [chat, setChat] = useState([]);
   const [allChats, setAllChats] = useState(() => {
     const saved = localStorage.getItem("allChats");
@@ -16,18 +15,21 @@ function App() {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
 
-  // ✅ Save current chat on refresh
+  // ✅ ONLY save when page is closed (NOT on click)
   useEffect(() => {
-    return () => {
-      if (chat.length > 0) {
-        setAllChats(prev => {
-          const updated = [...prev, chat];
-          localStorage.setItem("allChats", JSON.stringify(updated));
-          return updated;
-        });
+    const handleUnload = () => {
+      if (chat.length > 0 && activeChatIndex === null) {
+        const updated = [...allChats, chat];
+        localStorage.setItem("allChats", JSON.stringify(updated));
       }
     };
-  }, [chat]);
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [chat, allChats, activeChatIndex]);
 
   // ✅ Send message
   const sendMessage = async () => {
@@ -47,19 +49,22 @@ function App() {
       setChat(prev => [...prev, { user: input, ai: data.response }]);
       setInput("");
 
-    } catch (error) {
+    } catch {
       setChat(prev => [...prev, { user: input, ai: "Error: backend not reachable" }]);
     }
   };
 
-  // ✅ Load previous chat when clicked
+  // ✅ Load chat
   const loadChat = (index) => {
     setActiveChatIndex(index);
     setChat(allChats[index]);
   };
 
-  // ✅ Start new chat
+  // ✅ New chat
   const newChat = () => {
+    if (chat.length > 0 && activeChatIndex === null) {
+      setAllChats(prev => [...prev, chat]);
+    }
     setChat([]);
     setActiveChatIndex(null);
   };
@@ -67,7 +72,7 @@ function App() {
   return (
     <div style={{ display: "flex", height: "100vh" }}>
 
-      {/* ✅ LEFT SIDEBAR */}
+      {/* ✅ SIDEBAR */}
       <div style={{
         width: "250px",
         borderRight: "1px solid #ccc",
@@ -76,45 +81,78 @@ function App() {
       }}>
         <h2>Chats</h2>
 
-        <button onClick={newChat} style={{ width: "100%", marginBottom: "10px" }}>
+        <button onClick={newChat} style={{ width: "100%", marginBottom: 10 }}>
           + New Chat
         </button>
 
-        {allChats.map((c, index) => (
+        {allChats.map((c, i) => (
           <div
-            key={index}
-            onClick={() => loadChat(index)}
+            key={i}
+            onClick={() => loadChat(i)}
             style={{
-              padding: "10px",
-              marginBottom: "5px",
+              padding: 10,
+              marginBottom: 5,
               cursor: "pointer",
-              background: activeChatIndex === index ? "#ddd" : "#f5f5f5"
+              background: activeChatIndex === i ? "#ddd" : "#f5f5f5"
             }}
           >
-            Chat {index + 1}
+            Chat {i + 1}
           </div>
         ))}
       </div>
 
-      {/* ✅ RIGHT CHAT AREA */}
-      <div style={{ flex: 1, padding: "20px" }}>
-        <h1>Jarvis AI</h1>
+      {/* ✅ MAIN CHAT AREA */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh"
+      }}>
 
-        <div style={{ marginBottom: "20px" }}>
+        {/* ✅ MESSAGES */}
+        <div style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "20px"
+        }}>
           {chat.map((msg, i) => (
-            <div key={i}>
-              <p><b>You:</b> {msg.user}</p>
-              <p><b>Jarvis:</b> {msg.ai}</p>
+            <div key={i} style={{
+              display: "flex",
+              justifyContent: msg.user ? "flex-end" : "flex-start",
+              marginBottom: "10px"
+            }}>
+              <div style={{
+                maxWidth: "60%",
+                padding: "10px",
+                borderRadius: "10px",
+                background: msg.user ? "#007bff" : "#e5e5ea",
+                color: msg.user ? "white" : "black"
+              }}>
+                {msg.user ? msg.user : msg.ai}
+              </div>
             </div>
           ))}
         </div>
 
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask something..."
-        />
-        <button onClick={sendMessage}>Send</button>
+        {/* ✅ INPUT AT BOTTOM */}
+        <div style={{
+          padding: "10px",
+          borderTop: "1px solid #ccc",
+          display: "flex"
+        }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask something..."
+            style={{
+              flex: 1,
+              padding: "10px",
+              marginRight: "10px"
+            }}
+          />
+          <button onClick={sendMessage}>Send</button>
+        </div>
+
       </div>
     </div>
   );
