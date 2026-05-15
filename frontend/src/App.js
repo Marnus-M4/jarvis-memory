@@ -97,7 +97,6 @@ function App() {
   const newChat = () => {
     if (chat.length > 0 && activeChatIndex === null) {
       const title = chat[0]?.user?.slice(0, 30) || "New Chat";
-
       setAllChats(prev => [...prev, { title, messages: chat }]);
     }
     setChat([]);
@@ -129,7 +128,15 @@ function App() {
       }}>
         <h3>Chats</h3>
 
-        <button onClick={newChat} style={{ width: "100%" }}>
+        <button onClick={newChat} style={{
+          width: "100%",
+          padding: "8px",
+          borderRadius: "6px",
+          border: "none",
+          background: "#007bff",
+          color: "white",
+          cursor: "pointer"
+        }}>
           + New Chat
         </button>
 
@@ -142,37 +149,21 @@ function App() {
               marginTop: 5,
               cursor: "pointer",
               background: activeChatIndex === i ? "#ddd" : "#f5f5f5",
-              position: "relative"
+              position: "relative",
+              borderRadius: "6px"
             }}
           >
             {c.title}
 
             {/* ✅ HOVER MENU */}
-            <div
-              style={{
-                position: "absolute",
-                right: 10,
-                top: 10,
-                display: "none"
-              }}
-              className="menu"
-            >
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  renameChat(i);
-                }}
-              >
-                ✏️
-              </div>
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteChat(i);
-                }}
-              >
-                ❌
-              </div>
+            <div className="menu" style={{
+              position: "absolute",
+              right: 10,
+              top: 10,
+              display: "none"
+            }}>
+              <span onClick={(e) => { e.stopPropagation(); renameChat(i); }}>✏️</span>
+              <span onClick={(e) => { e.stopPropagation(); deleteChat(i); }}>❌</span>
             </div>
           </div>
         ))}
@@ -192,14 +183,11 @@ function App() {
           padding: 20
         }}>
           {chat.map((msg, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                justifyContent: msg.user ? "flex-end" : "flex-start",
-                marginBottom: 10
-              }}
-            >
+            <div key={i} style={{
+              display: "flex",
+              justifyContent: msg.user ? "flex-end" : "flex-start",
+              marginBottom: 10
+            }}>
               <div style={{
                 padding: 10,
                 borderRadius: 10,
@@ -212,51 +200,81 @@ function App() {
             </div>
           ))}
 
-          {/* ✅ TYPING INDICATOR */}
           {loading && (
-            <div style={{ color: "gray" }}>
-              Jarvis is thinking...
-            </div>
+            <div style={{ color: "#888" }}>Jarvis is thinking...</div>
           )}
 
           <div ref={chatEndRef}></div>
         </div>
 
-        {/* ✅ INPUT AREA */}
+        {/* ✅ PROFESSIONAL INPUT BAR */}
         <div style={{
-          display: "flex",
-          padding: 10,
-          borderTop: "1px solid #ccc",
-          alignItems: "center"
+          padding: "15px",
+          borderTop: "1px solid #ddd",
+          background: "#f9f9f9"
         }}>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask something..."
-            style={{
-              flex: 1,
-              resize: "none",
-              padding: 10,
-              height: 50
-            }}
-          />
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            background: "#fff",
+            borderRadius: "12px",
+            padding: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+          }}>
 
-          <button onClick={sendMessage}>Send</button>
-        </div>
-
-        {/* ✅ SCREEN TOGGLE */}
-        <div style={{ padding: 10 }}>
-          <label>
-            <input
-              type="checkbox"
-              checked={useScreen}
-              onChange={() => setUseScreen(!useScreen)}
+            {/* ✅ TEXTAREA */}
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Jarvis anything..."
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                resize: "none",
+                fontSize: "14px",
+                padding: "8px",
+                minHeight: "40px",
+                background: "transparent"
+              }}
             />
-            Use Screen Awareness
-          </label>
-        </div>
 
+            {/* ✅ SCREEN TOGGLE */}
+            <label style={{
+              display: "flex",
+              alignItems: "center",
+              marginRight: "10px",
+              fontSize: "12px",
+              color: "#555"
+            }}>
+              <input
+                type="checkbox"
+                checked={useScreen}
+                onChange={() => setUseScreen(!useScreen)}
+                style={{ marginRight: 5 }}
+              />
+              Screen
+            </label>
+
+            {/* ✅ SEND BUTTON */}
+            <button
+              onClick={sendMessage}
+              style={{
+                background: "#007bff",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 14px",
+                cursor: "pointer",
+                fontWeight: "bold"
+              }}
+            >
+              ➤
+            </button>
+
+          </div>
+        </div>
       </div>
 
       {/* ✅ HOVER STYLE */}
@@ -265,6 +283,10 @@ function App() {
           div:hover > .menu {
             display: flex !important;
             gap: 6px;
+          }
+
+          button:hover {
+            opacity: 0.9;
           }
         `}
       </style>
