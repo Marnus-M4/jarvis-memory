@@ -12,28 +12,25 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // ✅ save chat history whenever it updates
+  // ✅ persist history to localStorage when it changes
   useEffect(() => {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
 
-  // ✅ save current chat BEFORE refresh/unload
+  // ✅ save chat when page reloads (important fix)
   useEffect(() => {
-    const handleUnload = () => {
+    return () => {
       if (chat.length > 0) {
-        const updatedChats = [...allChats, chat];
-        localStorage.setItem("allChats", JSON.stringify(updatedChats));
+        setAllChats(prev => {
+          const updated = [...prev, chat];
+          localStorage.setItem("allChats", JSON.stringify(updated));
+          return updated;
+        });
       }
     };
+  }, [chat]);
 
-    window.addEventListener("beforeunload", handleUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload);
-    };
-  }, [chat, allChats]);
-
-  // ✅ send message
+  // ✅ send message to backend
   const sendMessage = async () => {
     if (!input) return;
 
@@ -48,12 +45,12 @@ function App() {
 
       const data = await res.json();
 
-      setChat([...chat, { user: input, ai: data.response }]);
+      setChat(prev => [...prev, { user: input, ai: data.response }]);
       setInput("");
 
     } catch (error) {
       console.error(error);
-      setChat([...chat, { user: input, ai: "Error: backend not reachable" }]);
+      setChat(prev => [...prev, { user: input, ai: "Error: backend not reachable" }]);
     }
   };
 
@@ -87,7 +84,10 @@ function App() {
       {/* ✅ CHAT HISTORY */}
       <h2>Chat History</h2>
       {allChats.map((c, index) => (
-        <div key={index} style={{ border: "1px solid gray", padding: 10, margin: 5 }}>
+        <div
+          key={index}
+          style={{ border: "1px solid gray", padding: 10, margin: 5 }}
+        >
           <p><b>Chat {index + 1}</b> ({c.length} messages)</p>
         </div>
       ))}
