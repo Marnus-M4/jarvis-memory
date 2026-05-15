@@ -195,17 +195,23 @@ function App() {
           borderTop: "1px solid #ccc",
           display: "flex"
         }}>
-          <input
-  value={input}
-  onChange={(e) => setInput(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter") {
-      sendMessage();
-    }
-  }}
-  placeholder="Ask something..."
-  style={{ flex: 1, padding: 10 }}
-/>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault(); // prevents newline
+              sendMessage();
+              }
+              }}
+              placeholder="Ask something..."
+              style={{
+              flex: 1,
+              padding: "10px",
+              resize: "none",
+              height: "50px"
+              }}
+            />
           <button onClick={sendMessage}>Send</button>
         </div>
 
