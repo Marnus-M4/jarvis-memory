@@ -1,27 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 function App() {
   const [input, setInput] = useState("");
   const [chat, setChat] = useState([]);
   const [activeChatIndex, setActiveChatIndex] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [useScreen, setUseScreen] = useState(false);
 
-  // ✅ load chat history
+  const chatEndRef = useRef(null);
+
   const [allChats, setAllChats] = useState(() => {
     const saved = localStorage.getItem("allChats");
     return saved ? JSON.parse(saved) : [];
   });
 
-  // ✅ save history
   useEffect(() => {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
 
-  // ✅ CAPTURE SCREEN
+  // ✅ AUTO SCROLL
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat, loading]);
+
+  // ✅ SCREEN CAPTURE
   const captureScreen = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true
-      });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
 
       const video = document.createElement("video");
       video.srcObject = stream;
@@ -39,23 +44,25 @@ function App() {
       stream.getTracks().forEach(track => track.stop());
 
       return image;
-
-    } catch (err) {
-      console.log("Screen capture cancelled");
+    } catch {
       return null;
     }
   };
 
-  // ✅ SEND MESSAGE (WITH SCREEN)
+  // ✅ SEND MESSAGE
   const sendMessage = async () => {
     if (!input) return;
 
+    setLoading(true);
+
     try {
-      const screenshot = await captureScreen();
+      const screenshot = useScreen ? await captureScreen() : null;
 
       const res = await fetch("https://jarvis-memory-8w92.onrender.com/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           question: input,
           image: screenshot
@@ -70,9 +77,11 @@ function App() {
     } catch {
       setChat(prev => [...prev, { user: input, ai: "Error sending message" }]);
     }
+
+    setLoading(false);
   };
 
-  // ✅ ENTER / SHIFT+ENTER
+  // ✅ ENTER / SHIFT ENTER
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -80,39 +89,26 @@ function App() {
     }
   };
 
-  // ✅ LOAD CHAT
   const loadChat = (index) => {
     setActiveChatIndex(index);
     setChat(allChats[index].messages);
   };
 
-  // ✅ CREATE NEW CHAT
   const newChat = () => {
     if (chat.length > 0 && activeChatIndex === null) {
       const title = chat[0]?.user?.slice(0, 30) || "New Chat";
 
-      setAllChats(prev => [
-        ...prev,
-        { title, messages: chat }
-      ]);
+      setAllChats(prev => [...prev, { title, messages: chat }]);
     }
-
     setChat([]);
     setActiveChatIndex(null);
   };
 
-  // ✅ DELETE CHAT
   const deleteChat = (index) => {
     const updated = allChats.filter((_, i) => i !== index);
     setAllChats(updated);
-
-    if (activeChatIndex === index) {
-      setChat([]);
-      setActiveChatIndex(null);
-    }
   };
 
-  // ✅ RENAME CHAT
   const renameChat = (index) => {
     const newName = prompt("Rename chat:");
     if (!newName) return;
@@ -123,15 +119,15 @@ function App() {
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
 
       {/* ✅ SIDEBAR */}
       <div style={{
-        width: 250,
+        width: 260,
         borderRight: "1px solid #ccc",
         padding: 10
       }}>
-        <h2>Chats</h2>
+        <h3>Chats</h3>
 
         <button onClick={newChat} style={{ width: "100%" }}>
           + New Chat
@@ -142,32 +138,42 @@ function App() {
             key={i}
             onClick={() => loadChat(i)}
             style={{
-              position: "relative",
               padding: 10,
               marginTop: 5,
               cursor: "pointer",
-              background: activeChatIndex === i ? "#ddd" : "#f5f5f5"
+              background: activeChatIndex === i ? "#ddd" : "#f5f5f5",
+              position: "relative"
             }}
           >
             {c.title}
 
-            {/* ✅ MENU */}
-            <span
+            {/* ✅ HOVER MENU */}
+            <div
               style={{
                 position: "absolute",
-                right: 10
+                right: 10,
+                top: 10,
+                display: "none"
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-
-                const action = prompt("delete or rename");
-
-                if (action === "delete") deleteChat(i);
-                if (action === "rename") renameChat(i);
-              }}
+              className="menu"
             >
-              ⋮
-            </span>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  renameChat(i);
+                }}
+              >
+                ✏️
+              </div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteChat(i);
+                }}
+              >
+                ❌
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -179,7 +185,7 @@ function App() {
         flexDirection: "column"
       }}>
 
-        {/* ✅ CHAT MESSAGES */}
+        {/* ✅ CHAT */}
         <div style={{
           flex: 1,
           overflowY: "auto",
@@ -205,13 +211,23 @@ function App() {
               </div>
             </div>
           ))}
+
+          {/* ✅ TYPING INDICATOR */}
+          {loading && (
+            <div style={{ color: "gray" }}>
+              Jarvis is thinking...
+            </div>
+          )}
+
+          <div ref={chatEndRef}></div>
         </div>
 
-        {/* ✅ INPUT */}
+        {/* ✅ INPUT AREA */}
         <div style={{
           display: "flex",
           padding: 10,
-          borderTop: "1px solid #ccc"
+          borderTop: "1px solid #ccc",
+          alignItems: "center"
         }}>
           <textarea
             value={input}
@@ -226,12 +242,33 @@ function App() {
             }}
           />
 
-          <button onClick={sendMessage}>
-            Send
-          </button>
+          <button onClick={sendMessage}>Send</button>
+        </div>
+
+        {/* ✅ SCREEN TOGGLE */}
+        <div style={{ padding: 10 }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={useScreen}
+              onChange={() => setUseScreen(!useScreen)}
+            />
+            Use Screen Awareness
+          </label>
         </div>
 
       </div>
+
+      {/* ✅ HOVER STYLE */}
+      <style>
+        {`
+          div:hover > .menu {
+            display: flex !important;
+            gap: 6px;
+          }
+        `}
+      </style>
+
     </div>
   );
 }
