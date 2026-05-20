@@ -30,56 +30,72 @@ def root():
     return {"message": "Jarvis backend running ✅"}
 
 
-# ✅ ✅ SAVE NOTES TO SUPABASE
+# ✅ ✅ CREATE EMBEDDING
+def get_embedding(text):
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=text
+    )
+    return response.data[0].embedding
+
+
+# ✅ ✅ SAVE NOTES WITH EMBEDDING (UPGRADED)
 @app.post("/upload_notes")
 def upload_notes(data: dict):
     try:
         notes = data.get("notes", "")
 
+        embedding = get_embedding(notes)
+
         supabase.table("notes").insert({
-            "content": notes
+            "content": notes,
+            "embedding": embedding
         }).execute()
 
-        return {"status": "notes saved ✅"}
+        return {"status": "notes saved with embeddings ✅"}
 
     except Exception as e:
         return {"error": str(e)}
 
 
-# ✅ ✅ GET NOTES FROM SUPABASE
-def get_notes():
+# ✅ ✅ SEARCH ONLY RELEVANT NOTES (NEW)
+def search_notes(query):
     try:
-        result = supabase.table("notes").select("content").execute()
+        query_embedding = get_embedding(query)
 
-        all_text = ""
+        result = supabase.rpc("match_notes", {
+            "query_embedding": query_embedding,
+            "match_count": 3
+        }).execute()
+
+        text = ""
 
         for row in result.data:
-            all_text += row["content"] + "\n\n"
+            text += row["content"] + "\n\n"
 
-        # ✅ limit (important for OpenAI)
-        return all_text[:12000]
+        return text
 
-    except Exception:
+    except Exception as e:
+        print("Search error:", e)
         return ""
 
 
-# ✅ ✅ MAIN ASK ROUTE
+# ✅ ✅ MAIN ASK ROUTE (UPGRADED TO RAG)
 @app.post("/ask")
 def ask(data: dict):
     try:
         question = data.get("question")
         image_base64 = data.get("image")
 
-        # ✅ GET SAVED NOTES FROM DB
-        notes = get_notes()
+        # ✅ 🔥 USE SMART SEARCH INSTEAD OF ALL NOTES
+        notes = search_notes(question)
 
         content = []
 
-        # ✅ BUILD PROMPT
         prompt = f"""
 You are Jarvis, a personal AI assistant.
 
-Use the user's knowledge base below when relevant:
+Use ONLY the relevant knowledge below:
 
 {notes}
 
@@ -94,7 +110,6 @@ User question:
             "text": prompt
         })
 
-        # ✅ INCLUDE IMAGE (screen awareness)
         if image_base64:
             image_base64 = image_base64.split(",")[1]
 
