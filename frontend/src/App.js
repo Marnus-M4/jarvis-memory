@@ -6,6 +6,7 @@ function App() {
   const [activeChatIndex, setActiveChatIndex] = useState(null);
   const [loading, setLoading] = useState(false);
   const [useScreen, setUseScreen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(null);
 
   const chatEndRef = useRef(null);
 
@@ -14,7 +15,7 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // ✅ SAVE ALL CHATS
+  // ✅ SAVE CHATS
   useEffect(() => {
     localStorage.setItem("allChats", JSON.stringify(allChats));
   }, [allChats]);
@@ -24,42 +25,31 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, loading]);
 
-  // ✅ ✅ FIXED AUTO SAVE FUNCTION
+  // ✅ AUTO SAVE
   const saveCurrentChat = useCallback(() => {
     if (chat.length === 0 || activeChatIndex !== null) return;
 
     const title = chat[0]?.user?.slice(0, 30) || "New Chat";
-
     const existing = JSON.parse(localStorage.getItem("allChats")) || [];
-
     const last = existing[existing.length - 1];
 
-    // ✅ prevent duplicates
     if (JSON.stringify(last?.messages) === JSON.stringify(chat)) return;
 
     const updated = [...existing, { title, messages: chat }];
-
     localStorage.setItem("allChats", JSON.stringify(updated));
   }, [chat, activeChatIndex]);
 
-  // ✅ ✅ FIXED useEffect (NO ERRORS)
   useEffect(() => {
-    const handleUnload = () => {
-      saveCurrentChat();
-    };
+    const handleUnload = () => saveCurrentChat();
 
     window.addEventListener("beforeunload", handleUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleUnload);
-    };
+    return () => window.removeEventListener("beforeunload", handleUnload);
   }, [saveCurrentChat]);
 
   // ✅ SCREEN CAPTURE
   const captureScreen = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-
       const video = document.createElement("video");
       video.srcObject = stream;
       await video.play();
@@ -92,7 +82,9 @@ function App() {
 
       const res = await fetch("https://jarvis-memory-8w92.onrender.com/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           question: input,
           image: screenshot
@@ -111,7 +103,7 @@ function App() {
     setLoading(false);
   };
 
-  // ✅ ENTER / SHIFT ENTER
+  // ✅ ENTER KEY
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -122,10 +114,11 @@ function App() {
   const loadChat = (index) => {
     setActiveChatIndex(index);
     setChat(allChats[index].messages);
+    setMenuOpen(null);
   };
 
   const newChat = () => {
-    saveCurrentChat(); // ✅ ensures save
+    saveCurrentChat();
     setChat([]);
     setActiveChatIndex(null);
   };
@@ -148,11 +141,7 @@ function App() {
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
 
       {/* ✅ SIDEBAR */}
-      <div style={{
-        width: 260,
-        borderRight: "1px solid #ccc",
-        padding: 10
-      }}>
+      <div style={{ width: 260, borderRight: "1px solid #ccc", padding: 10 }}>
         <h3>Chats</h3>
 
         <button onClick={newChat} style={{
@@ -176,38 +165,78 @@ function App() {
               marginTop: 5,
               cursor: "pointer",
               background: activeChatIndex === i ? "#ddd" : "#f5f5f5",
-              position: "relative",
-              borderRadius: "6px"
+              borderRadius: "6px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              position: "relative"
             }}
           >
-            {c.title}
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+              {c.title}
+            </span>
 
-            <div className="menu" style={{
-              position: "absolute",
-              right: 10,
-              top: 10,
-              display: "none"
-            }}>
-              <span onClick={(e) => { e.stopPropagation(); renameChat(i); }}>✏️</span>
-              <span onClick={(e) => { e.stopPropagation(); deleteChat(i); }}>❌</span>
+            {/* ✅ DOT MENU BUTTON */}
+            <div
+              className="dots"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(menuOpen === i ? null : i);
+              }}
+              style={{
+                opacity: 0,
+                cursor: "pointer",
+                padding: "5px"
+              }}
+            >
+              ⋯
             </div>
+
+            {/* ✅ DROPDOWN */}
+            {menuOpen === i && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  top: "40px",
+                  right: "10px",
+                  background: "white",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  border: "1px solid #ddd",
+                  zIndex: 10
+                }}
+              >
+                <div
+                  style={{ padding: "10px 15px", cursor: "pointer" }}
+                  onClick={() => {
+                    renameChat(i);
+                    setMenuOpen(null);
+                  }}
+                >
+                  ✏️ Rename
+                </div>
+
+                <div
+                  style={{ padding: "10px 15px", cursor: "pointer", color: "red" }}
+                  onClick={() => {
+                    deleteChat(i);
+                    setMenuOpen(null);
+                  }}
+                >
+                  🗑 Delete
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {/* ✅ MAIN */}
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column"
-      }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
 
         {/* ✅ CHAT */}
-        <div style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: 20
-        }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
           {chat.map((msg, i) => (
             <div key={i} style={{
               display: "flex",
@@ -226,14 +255,12 @@ function App() {
             </div>
           ))}
 
-          {loading && (
-            <div style={{ color: "#888" }}>Jarvis is thinking...</div>
-          )}
+          {loading && <div style={{ color: "#888" }}>Jarvis is thinking...</div>}
 
           <div ref={chatEndRef}></div>
         </div>
 
-        {/* ✅ INPUT */}
+        {/* ✅ INPUT BAR */}
         <div style={{
           padding: "15px",
           borderTop: "1px solid #ddd",
@@ -267,14 +294,12 @@ function App() {
               display: "flex",
               alignItems: "center",
               marginRight: "10px",
-              fontSize: "12px",
-              color: "#555"
+              fontSize: "12px"
             }}>
               <input
                 type="checkbox"
                 checked={useScreen}
                 onChange={() => setUseScreen(!useScreen)}
-                style={{ marginRight: 5 }}
               />
               Screen
             </label>
@@ -293,11 +318,11 @@ function App() {
         </div>
       </div>
 
+      {/* ✅ HOVER + UI CSS */}
       <style>
         {`
-          div:hover > .menu {
-            display: flex !important;
-            gap: 6px;
+          div:hover > .dots {
+            opacity: 1;
           }
 
           button:hover {
