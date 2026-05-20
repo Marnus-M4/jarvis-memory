@@ -7,6 +7,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [useScreen, setUseScreen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
+  const [hoverIndex, setHoverIndex] = useState(null); // ✅ FIX
 
   const chatEndRef = useRef(null);
 
@@ -160,6 +161,8 @@ function App() {
           <div
             key={i}
             onClick={() => loadChat(i)}
+            onMouseEnter={() => setHoverIndex(i)}   // ✅ FIX
+            onMouseLeave={() => setHoverIndex(null)} // ✅ FIX
             style={{
               padding: 10,
               marginTop: 5,
@@ -176,21 +179,21 @@ function App() {
               {c.title}
             </span>
 
-            {/* ✅ DOT MENU BUTTON */}
-            <div
-              className="dots"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen(menuOpen === i ? null : i);
-              }}
-              style={{
-                opacity: 0,
-                cursor: "pointer",
-                padding: "5px"
-              }}
-            >
-              ⋯
-            </div>
+            {/* ✅ DOT BUTTON */}
+            {hoverIndex === i && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(menuOpen === i ? null : i);
+                }}
+                style={{
+                  cursor: "pointer",
+                  padding: "5px"
+                }}
+              >
+                ⋯
+              </div>
+            )}
 
             {/* ✅ DROPDOWN */}
             {menuOpen === i && (
@@ -260,7 +263,7 @@ function App() {
           <div ref={chatEndRef}></div>
         </div>
 
-        {/* ✅ INPUT BAR */}
+        {/* ✅ INPUT */}
         <div style={{
           padding: "15px",
           borderTop: "1px solid #ddd",
@@ -317,20 +320,6 @@ function App() {
           </div>
         </div>
       </div>
-
-      {/* ✅ HOVER + UI CSS */}
-      <style>
-        {`
-          div:hover > .dots {
-            opacity: 1;
-          }
-
-          button:hover {
-            opacity: 0.9;
-          }
-        `}
-      </style>
-
     </div>
   );
 }
