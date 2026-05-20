@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import base64
 from openai import OpenAI
+from supabase import create_client
 
 app = FastAPI()
 
@@ -18,32 +18,49 @@ app.add_middleware(
 # ✅ OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# ✅ Supabase setup
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 # ✅ ROOT TEST
 @app.get("/")
 def root():
     return {"message": "Jarvis backend running ✅"}
 
-# ✅ ✅ LOAD OBSIDIAN NOTES
-def load_obsidian_notes():
-    # 🔥 CHANGE THIS PATH TO YOUR VAULT LOCATION
-    vault_path = r"C:\Users\MarnusvandenHeever\OneDrive - Flawless IT Solutions Ltd\Documents\Kowledge"
 
-    all_text = ""
+# ✅ ✅ SAVE NOTES TO SUPABASE
+@app.post("/upload_notes")
+def upload_notes(data: dict):
+    try:
+        notes = data.get("notes", "")
 
-    if not os.path.exists(vault_path):
+        supabase.table("notes").insert({
+            "content": notes
+        }).execute()
+
+        return {"status": "notes saved ✅"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ✅ ✅ GET NOTES FROM SUPABASE
+def get_notes():
+    try:
+        result = supabase.table("notes").select("content").execute()
+
+        all_text = ""
+
+        for row in result.data:
+            all_text += row["content"] + "\n\n"
+
+        # ✅ limit (important for OpenAI)
+        return all_text[:12000]
+
+    except Exception:
         return ""
-
-    for root, dirs, files in os.walk(vault_path):
-        for file in files:
-            if file.endswith(".md"):
-                try:
-                    with open(os.path.join(root, file), "r", encoding="utf-8") as f:
-                        all_text += f.read() + "\n\n"
-                except:
-                    pass
-
-    # ✅ limit size (important for API)
-    return all_text[:12000]
 
 
 # ✅ ✅ MAIN ASK ROUTE
@@ -53,20 +70,20 @@ def ask(data: dict):
         question = data.get("question")
         image_base64 = data.get("image")
 
-        # ✅ load knowledge base
-        notes = load_obsidian_notes()
+        # ✅ GET SAVED NOTES FROM DB
+        notes = get_notes()
 
         content = []
 
-        # ✅ add question + knowledge
+        # ✅ BUILD PROMPT
         prompt = f"""
 You are Jarvis, a personal AI assistant.
 
-Use the user's knowledge base from Obsidian notes:
+Use the user's knowledge base below when relevant:
 
 {notes}
 
-Answer the question clearly and helpfully.
+Answer clearly and helpfully.
 
 User question:
 {question}
@@ -77,7 +94,7 @@ User question:
             "text": prompt
         })
 
-        # ✅ include screen if provided
+        # ✅ INCLUDE IMAGE (screen awareness)
         if image_base64:
             image_base64 = image_base64.split(",")[1]
 
