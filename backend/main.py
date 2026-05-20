@@ -2,8 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import requests
+from dotenv import load_dotenv  # ✅ NEW
 from openai import OpenAI
 from supabase import create_client
+
+# ✅ LOAD .env FILE (VERY IMPORTANT)
+load_dotenv()
 
 app = FastAPI()
 
@@ -16,12 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ OpenAI client (optional for now)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ✅ OpenAI client (safe if key missing)
+openai_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_key) if openai_key else None
 
 # ✅ Supabase setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ ROOT TEST
@@ -30,25 +36,35 @@ def root():
     return {"message": "Jarvis backend running ✅"}
 
 
-# ✅ ✅ CREATE EMBEDDING (SAFE VERSION)
+# ✅ ✅ CREATE EMBEDDING (SAFE)
 def get_embedding(text):
     try:
+        if not client:
+            return None
+
         response = client.embeddings.create(
             model="text-embedding-3-small",
             input=text
         )
         return response.data[0].embedding
-    except:
-        return None  # ✅ no API key yet
+
+    except Exception as e:
+        print("Embedding error:", e)
+        return None
 
 
-# ✅ ✅ RECURSIVE GITHUB FILE READER (🔥 VERY IMPORTANT)
+# ✅ ✅ RECURSIVE GITHUB FILE READER
 def get_all_md_files(url):
     headers = {
         "Accept": "application/vnd.github.v3+json"
     }
 
     response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        print("GitHub API error:", response.text)
+        return ""
+
     items = response.json()
 
     all_text = ""
@@ -59,13 +75,12 @@ def get_all_md_files(url):
             all_text += file_res.text + "\n\n"
 
         elif item["type"] == "dir":
-            # ✅ go deeper into folders
             all_text += get_all_md_files(item["url"])
 
     return all_text
 
 
-# ✅ ✅ MANUAL UPLOAD (still useful)
+# ✅ ✅ MANUAL UPLOAD
 @app.post("/upload_notes")
 def upload_notes(data: dict):
     try:
@@ -73,11 +88,8 @@ def upload_notes(data: dict):
 
         embedding = get_embedding(notes)
 
-        data_to_insert = {
-            "content": notes
-        }
+        data_to_insert = {"content": notes}
 
-        # ✅ only add embedding if it exists
         if embedding:
             data_to_insert["embedding"] = embedding
 
@@ -89,26 +101,24 @@ def upload_notes(data: dict):
         return {"error": str(e)}
 
 
-# ✅ ✅ GITHUB WEBHOOK (FIXED VERSION)
+# ✅ ✅ GITHUB WEBHOOK
 GITHUB_REPO_API = "https://api.github.com/repos/Marnus-M4/obsidian-vault/contents"
 
 
 @app.post("/github_webhook")
 async def github_webhook(payload: dict):
     try:
-        # ✅ get ALL markdown files (recursive)
+        print("Webhook triggered ✅")
+
         all_text = get_all_md_files(GITHUB_REPO_API)
 
-        if all_text.strip() == "":
+        if not all_text.strip():
             return {"status": "no notes found"}
 
         embedding = get_embedding(all_text)
 
-        data_to_insert = {
-            "content": all_text
-        }
+        data_to_insert = {"content": all_text}
 
-        # ✅ only store embedding if available
         if embedding:
             data_to_insert["embedding"] = embedding
 
@@ -117,10 +127,11 @@ async def github_webhook(payload: dict):
         return {"status": "github sync complete ✅"}
 
     except Exception as e:
+        print("Webhook error:", e)
         return {"error": str(e)}
 
 
-# ✅ ✅ SEARCH (disabled until embeddings exist)
+# ✅ ✅ SEARCH (only if embeddings exist)
 def search_notes(query):
     try:
         query_embedding = get_embedding(query)
@@ -163,6 +174,9 @@ Use the knowledge below if available:
 User question:
 {question}
 """
+
+        if not client:
+            return {"response": "⚠️ AI not active yet (no API key)"}
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
