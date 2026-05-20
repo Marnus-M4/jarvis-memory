@@ -26,7 +26,7 @@ def root():
 # ✅ ✅ LOAD OBSIDIAN NOTES
 def load_obsidian_notes():
     # 🔥 CHANGE THIS PATH TO YOUR VAULT LOCATION
-    vault_path = r"C:\Users\MarnusvandenHeever\Documents\ObsidianVault"
+    vault_path = r"C:\Users\MarnusvandenHeever\OneDrive - Flawless IT Solutions Ltd\Documents\Kowledge"
 
     all_text = ""
 
