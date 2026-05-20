@@ -7,7 +7,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [useScreen, setUseScreen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
-  const [hoverIndex, setHoverIndex] = useState(null); // ✅ FIX
+  const [hoverIndex, setHoverIndex] = useState(null);
 
   const chatEndRef = useRef(null);
 
@@ -25,6 +25,19 @@ function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, loading]);
+
+  // ✅ ✅ CLOSE MENU WHEN CLICKING OUTSIDE
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setMenuOpen(null);
+    };
+
+    window.addEventListener("click", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
 
   // ✅ AUTO SAVE
   const saveCurrentChat = useCallback(() => {
@@ -72,7 +85,6 @@ function App() {
     }
   };
 
-  // ✅ SEND MESSAGE
   const sendMessage = async () => {
     if (!input) return;
 
@@ -104,7 +116,6 @@ function App() {
     setLoading(false);
   };
 
-  // ✅ ENTER KEY
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -141,7 +152,7 @@ function App() {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
 
-      {/* ✅ SIDEBAR */}
+      {/* SIDEBAR */}
       <div style={{ width: 260, borderRight: "1px solid #ccc", padding: 10 }}>
         <h3>Chats</h3>
 
@@ -161,8 +172,8 @@ function App() {
           <div
             key={i}
             onClick={() => loadChat(i)}
-            onMouseEnter={() => setHoverIndex(i)}   // ✅ FIX
-            onMouseLeave={() => setHoverIndex(null)} // ✅ FIX
+            onMouseEnter={() => setHoverIndex(i)}
+            onMouseLeave={() => setHoverIndex(null)}
             style={{
               padding: 10,
               marginTop: 5,
@@ -175,27 +186,20 @@ function App() {
               position: "relative"
             }}
           >
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-              {c.title}
-            </span>
+            <span>{c.title}</span>
 
-            {/* ✅ DOT BUTTON */}
             {hoverIndex === i && (
               <div
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen(menuOpen === i ? null : i);
                 }}
-                style={{
-                  cursor: "pointer",
-                  padding: "5px"
-                }}
+                style={{ cursor: "pointer", padding: "5px" }}
               >
                 ⋯
               </div>
             )}
 
-            {/* ✅ DROPDOWN */}
             {menuOpen === i && (
               <div
                 onClick={(e) => e.stopPropagation()}
@@ -235,10 +239,9 @@ function App() {
         ))}
       </div>
 
-      {/* ✅ MAIN */}
+      {/* MAIN */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
 
-        {/* ✅ CHAT */}
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
           {chat.map((msg, i) => (
             <div key={i} style={{
@@ -259,11 +262,9 @@ function App() {
           ))}
 
           {loading && <div style={{ color: "#888" }}>Jarvis is thinking...</div>}
-
           <div ref={chatEndRef}></div>
         </div>
 
-        {/* ✅ INPUT */}
         <div style={{
           padding: "15px",
           borderTop: "1px solid #ddd",
@@ -271,11 +272,9 @@ function App() {
         }}>
           <div style={{
             display: "flex",
-            alignItems: "center",
             background: "#fff",
             borderRadius: "12px",
-            padding: "10px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+            padding: "10px"
           }}>
             <textarea
               value={input}
@@ -286,37 +285,19 @@ function App() {
                 flex: 1,
                 border: "none",
                 outline: "none",
-                resize: "none",
-                padding: "8px",
-                minHeight: "40px",
-                background: "transparent"
+                resize: "none"
               }}
             />
 
-            <label style={{
-              display: "flex",
-              alignItems: "center",
-              marginRight: "10px",
-              fontSize: "12px"
-            }}>
+            <label style={{ marginRight: "10px" }}>
               <input
                 type="checkbox"
                 checked={useScreen}
                 onChange={() => setUseScreen(!useScreen)}
-              />
-              Screen
+              /> Screen
             </label>
 
-            <button onClick={sendMessage} style={{
-              background: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "8px 14px",
-              cursor: "pointer"
-            }}>
-              ➤
-            </button>
+            <button onClick={sendMessage}>➤</button>
           </div>
         </div>
       </div>
