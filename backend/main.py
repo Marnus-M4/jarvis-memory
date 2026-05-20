@@ -2,16 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import requests
-from dotenv import load_dotenv  # ✅ NEW
+from dotenv import load_dotenv
 from openai import OpenAI
 from supabase import create_client
 
-# ✅ LOAD .env FILE (VERY IMPORTANT)
+# ✅ LOAD ENV
 load_dotenv()
 
 app = FastAPI()
 
-# ✅ allow frontend
+# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,23 +20,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ OpenAI client (safe if key missing)
+# ✅ OpenAI (safe)
 openai_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_key) if openai_key else None
 
-# ✅ Supabase setup
+# ✅ Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ✅ ROOT TEST
+# ✅ ROOT
 @app.get("/")
 def root():
     return {"message": "Jarvis backend running ✅"}
 
 
-# ✅ ✅ CREATE EMBEDDING (SAFE)
+# ✅ EMBEDDING
 def get_embedding(text):
     try:
         if not client:
@@ -53,8 +52,17 @@ def get_embedding(text):
         return None
 
 
-# ✅ ✅ RECURSIVE GITHUB FILE READER
-def get_all_md_files(url):
+# ✅ ✅ ✅ CORRECT RECURSIVE FUNCTION (FIXED 🔥)
+def get_all_md_files(path=""):
+    base_url = "https://api.github.com/repos/Marnus-M4/obsidian-vault/contents"
+
+    if path:
+        url = f"{base_url}/{path}"
+    else:
+        url = base_url
+
+    print("Fetching:", url)
+
     headers = {
         "Accept": "application/vnd.github.v3+json"
     }
@@ -70,17 +78,21 @@ def get_all_md_files(url):
     all_text = ""
 
     for item in items:
+        print(f"Found: {item['name']} ({item['type']})")
+
         if item["type"] == "file" and item["name"].endswith(".md"):
+            print("Reading file:", item["path"])
             file_res = requests.get(item["download_url"])
             all_text += file_res.text + "\n\n"
 
         elif item["type"] == "dir":
-            all_text += get_all_md_files(item["url"])
+            print("Entering folder:", item["path"])
+            all_text += get_all_md_files(item["path"])  # ✅ FIXED
 
     return all_text
 
 
-# ✅ ✅ MANUAL UPLOAD
+# ✅ MANUAL UPLOAD
 @app.post("/upload_notes")
 def upload_notes(data: dict):
     try:
@@ -101,18 +113,18 @@ def upload_notes(data: dict):
         return {"error": str(e)}
 
 
-# ✅ ✅ GITHUB WEBHOOK
-GITHUB_REPO_API = "https://api.github.com/repos/Marnus-M4/obsidian-vault/contents"
-
-
+# ✅ ✅ WEBHOOK
 @app.post("/github_webhook")
 async def github_webhook(payload: dict):
     try:
-        print("Webhook triggered ✅")
+        print("🔥 Webhook triggered!")
 
-        all_text = get_all_md_files(GITHUB_REPO_API)
+        all_text = get_all_md_files()
+
+        print("Collected length:", len(all_text))
 
         if not all_text.strip():
+            print("⚠️ No markdown files found")
             return {"status": "no notes found"}
 
         embedding = get_embedding(all_text)
@@ -124,6 +136,8 @@ async def github_webhook(payload: dict):
 
         supabase.table("notes").insert(data_to_insert).execute()
 
+        print("✅ Data inserted into Supabase")
+
         return {"status": "github sync complete ✅"}
 
     except Exception as e:
@@ -131,7 +145,7 @@ async def github_webhook(payload: dict):
         return {"error": str(e)}
 
 
-# ✅ ✅ SEARCH (only if embeddings exist)
+# ✅ SEARCH
 def search_notes(query):
     try:
         query_embedding = get_embedding(query)
@@ -156,7 +170,7 @@ def search_notes(query):
         return ""
 
 
-# ✅ ✅ ASK ROUTE
+# ✅ ASK
 @app.post("/ask")
 def ask(data: dict):
     try:
@@ -165,27 +179,25 @@ def ask(data: dict):
         notes = search_notes(question)
 
         prompt = f"""
-You are Jarvis, a personal AI assistant.
+You are Jarvis.
 
-Use the knowledge below if available:
+Use knowledge if available:
 
 {notes}
 
-User question:
+Question:
 {question}
 """
 
         if not client:
-            return {"response": "⚠️ AI not active yet (no API key)"}
+            return {"response": "⚠️ AI not active (no API key yet)"}
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
 
         return {"response": response.choices[0].message.content}
 
     except Exception as e:
-        return {"response": f"Error: {str(e)}"}
+        return {"response": str(e)}
