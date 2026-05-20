@@ -16,13 +16,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ OpenAI client
+# ✅ OpenAI client (optional for now)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ✅ Supabase setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ ROOT TEST
@@ -31,16 +30,42 @@ def root():
     return {"message": "Jarvis backend running ✅"}
 
 
-# ✅ ✅ CREATE EMBEDDING
+# ✅ ✅ CREATE EMBEDDING (SAFE VERSION)
 def get_embedding(text):
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text
-    )
-    return response.data[0].embedding
+    try:
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text
+        )
+        return response.data[0].embedding
+    except:
+        return None  # ✅ no API key yet
 
 
-# ✅ ✅ SAVE NOTES WITH EMBEDDING (MANUAL UPLOAD)
+# ✅ ✅ RECURSIVE GITHUB FILE READER (🔥 VERY IMPORTANT)
+def get_all_md_files(url):
+    headers = {
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    response = requests.get(url, headers=headers)
+    items = response.json()
+
+    all_text = ""
+
+    for item in items:
+        if item["type"] == "file" and item["name"].endswith(".md"):
+            file_res = requests.get(item["download_url"])
+            all_text += file_res.text + "\n\n"
+
+        elif item["type"] == "dir":
+            # ✅ go deeper into folders
+            all_text += get_all_md_files(item["url"])
+
+    return all_text
+
+
+# ✅ ✅ MANUAL UPLOAD (still useful)
 @app.post("/upload_notes")
 def upload_notes(data: dict):
     try:
@@ -48,21 +73,60 @@ def upload_notes(data: dict):
 
         embedding = get_embedding(notes)
 
-        supabase.table("notes").insert({
-            "content": notes,
-            "embedding": embedding
-        }).execute()
+        data_to_insert = {
+            "content": notes
+        }
 
-        return {"status": "notes saved with embeddings ✅"}
+        # ✅ only add embedding if it exists
+        if embedding:
+            data_to_insert["embedding"] = embedding
+
+        supabase.table("notes").insert(data_to_insert).execute()
+
+        return {"status": "notes saved ✅"}
 
     except Exception as e:
         return {"error": str(e)}
 
 
-# ✅ ✅ SEARCH ONLY RELEVANT NOTES (RAG)
+# ✅ ✅ GITHUB WEBHOOK (FIXED VERSION)
+GITHUB_REPO_API = "https://api.github.com/repos/Marnus-M4/obsidian-vault/contents"
+
+
+@app.post("/github_webhook")
+async def github_webhook(payload: dict):
+    try:
+        # ✅ get ALL markdown files (recursive)
+        all_text = get_all_md_files(GITHUB_REPO_API)
+
+        if all_text.strip() == "":
+            return {"status": "no notes found"}
+
+        embedding = get_embedding(all_text)
+
+        data_to_insert = {
+            "content": all_text
+        }
+
+        # ✅ only store embedding if available
+        if embedding:
+            data_to_insert["embedding"] = embedding
+
+        supabase.table("notes").insert(data_to_insert).execute()
+
+        return {"status": "github sync complete ✅"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ✅ ✅ SEARCH (disabled until embeddings exist)
 def search_notes(query):
     try:
         query_embedding = get_embedding(query)
+
+        if not query_embedding:
+            return ""
 
         result = supabase.rpc("match_notes", {
             "query_embedding": query_embedding,
@@ -81,92 +145,33 @@ def search_notes(query):
         return ""
 
 
-# ✅ ✅ GITHUB WEBHOOK SYNC (AUTOMATIC)
-GITHUB_REPO_API = "https://api.github.com/repos/YOUR_USERNAME/YOUR_REPO/contents"
-
-
-@app.post("/github_webhook")
-async def github_webhook(payload: dict):
-    try:
-        headers = {
-            "Accept": "application/vnd.github.v3+json"
-        }
-
-        response = requests.get(GITHUB_REPO_API, headers=headers)
-        files = response.json()
-
-        all_text = ""
-
-        for file in files:
-            if file["name"].endswith(".md"):
-                file_res = requests.get(file["download_url"])
-                all_text += file_res.text + "\n\n"
-
-        if all_text.strip() == "":
-            return {"status": "no notes found"}
-
-        embedding = get_embedding(all_text)
-
-        supabase.table("notes").insert({
-            "content": all_text,
-            "embedding": embedding
-        }).execute()
-
-        return {"status": "github sync complete ✅"}
-
-    except Exception as e:
-        return {"error": str(e)}
-
-
-# ✅ ✅ MAIN ASK ROUTE (RAG + AI)
+# ✅ ✅ ASK ROUTE
 @app.post("/ask")
 def ask(data: dict):
     try:
         question = data.get("question")
-        image_base64 = data.get("image")
 
-        # ✅ use smart search
         notes = search_notes(question)
-
-        content = []
 
         prompt = f"""
 You are Jarvis, a personal AI assistant.
 
-Use ONLY the relevant knowledge below:
+Use the knowledge below if available:
 
 {notes}
-
-Answer clearly and helpfully.
 
 User question:
 {question}
 """
 
-        content.append({
-            "type": "input_text",
-            "text": prompt
-        })
-
-        if image_base64:
-            image_base64 = image_base64.split(",")[1]
-
-            content.append({
-                "type": "input_image",
-                "image_base64": image_base64
-            })
-
-        response = client.responses.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
-            input=[{
-                "role": "user",
-                "content": content
-            }]
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
         )
 
-        return {
-            "response": response.output_text
-        }
+        return {"response": response.choices[0].message.content}
 
     except Exception as e:
         return {"response": f"Error: {str(e)}"}
